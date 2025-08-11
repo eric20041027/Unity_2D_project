@@ -2,200 +2,177 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 using System.Collections.Generic;
 using System.Collections;
+using Random = System.Random;
 
 public class BoardManager : MonoBehaviour
 {
-   public enum Grid
+   public class CellData
    {
-      Wall,
-      Floor,
-      Empty,
+      public bool Passible;
+      public GameObject CotainedObject;
+      public bool HasCreatedTile;
    }
 
-   public Grid[,] gridHandler;
-   public List<WalkerObject> Walkers;
-   public Tilemap tileMap;
-   public Tile Floor;
-   public Tile Wall;
-   public int mapHeight = 30;
-   public int mapWidth = 30;
-
-   public int maxWalker = 10;
-   public int tileCount = 0;
-   public float fillPercentage = 0.4f;
-   public float waitTime = 0.05f;
-
-   void Start()
+   public CellData GetCellData(Vector2Int cellIndex)
    {
+      if (cellIndex.x < 0 || cellIndex.x > width || cellIndex.y < 0 || cellIndex.y > height)
+      {
+         return null;
+      } 
+      return m_BoardData[cellIndex.x, cellIndex.y];
+   }
+
+   public Vector3 GetCellPosition(Vector2Int cellIndex)
+   {
+      return _grid.GetCellCenterWorld((Vector3Int)cellIndex);
+   }
+
+   private List<Vector2Int> _emptyCellList;
+   public int height = 30;
+   public int width = 30;
+   private Tilemap _tilemap;
+   private Grid _grid;
+   private CellData[,] m_BoardData;
+   public Tile grassTile;
+   public Tile dirtTile;
+   public Tile clayTile;
+   private int _tileCount;
+   public float fillPercentage = 0.5f;
+   public float waitTime = 0.05f;
+   public List<WalkerObject> Walkers;
+   public int maxWalkerNumber =10;
+
+   private void Start()
+   {
+      _grid = GetComponent<Grid>();
+      _tilemap = GetComponent<Tilemap>();
+      _emptyCellList = new List<Vector2Int>();
+      m_BoardData = new CellData[width, height];
       InitialGrid();
    }
 
    void InitialGrid()
    {
-      gridHandler = new Grid[mapHeight, mapWidth];
-      for (int x = 0; x < gridHandler.GetLength(0); x++)
+      for (int x = 0; x < width; x++)
       {
-         for (int y = 0; y < gridHandler.GetLength(1); y++)
+         for (int y = 0; y < height; y++)
          {
-            gridHandler[x,y] = Grid.Empty; 
+            m_BoardData[x, y] = new CellData();
+            m_BoardData[x, y].CotainedObject = null;
+            m_BoardData[x, y].HasCreatedTile = false;
+            m_BoardData[x, y].Passible = false;
          }
       }
-      
+
       Walkers = new List<WalkerObject>();
-      Vector3Int tileCenter = new Vector3Int(gridHandler.GetLength(0)/2,gridHandler.GetLength(1)/2,0);
-      WalkerObject currentWalker = new WalkerObject(new Vector2(tileCenter.x, tileCenter.y),GetDirection(),0.5f);
-      gridHandler[tileCenter.x, tileCenter.y] = Grid.Floor;
-      tileMap.SetTile(tileCenter, Floor);
-      Walkers.Add(currentWalker);
-      tileCount++;
-      StartCoroutine(CreateFloor());
+      WalkerObject walker = new WalkerObject (Vector2Int.zero,GetDirection(),0.5f);
+      _tilemap.SetTile(new Vector3Int(walker.Position.x,walker.Position.y,0), grassTile);
+      Walkers.Add(walker);
+      _tileCount++;
+      StartCoroutine(CreateBoard());
    }
 
    Vector2 GetDirection()
    {
-      int choice = Mathf.FloorToInt(UnityEngine.Random.value * 3.99f);
-
-      switch (choice)
+      int direction = Mathf.FloorToInt(UnityEngine.Random.value * 3.99f);
+      switch (direction)
       {
-         case 0:
-            return Vector2.down;
-         case 1:
-            return Vector2.left;
-         case 2:
-            return Vector2.up;
-         case 3:
+         case 0:  
             return Vector2.right;
-         default:
-            return Vector2.zero;
+         case 1:  
+            return Vector2.left;
+         case 2:  
+            return Vector2.up;
+         case 3:  
+            return Vector2.down;
       }
+      return Vector2.zero;
    }
 
-   IEnumerator CreateFloor()
+   IEnumerator CreateBoard()
    {
-      while ((float)tileCount / (float)gridHandler.Length < fillPercentage)
+      while ((float)_tileCount /(float)m_BoardData.Length < fillPercentage)
       {
-         bool hasCreatedFloor = false;
-         foreach (WalkerObject currentWalker in Walkers)
+         bool hasCreated = false;
+         foreach (WalkerObject walker in Walkers)
          {
-            Vector3Int currentPosition = new Vector3Int((int)currentWalker.Position.x, (int)currentWalker.Position.y, 0);
-            if (gridHandler[currentPosition.x, currentPosition.y] != Grid.Floor)
+            Vector3Int currentPosition = new Vector3Int(walker.Position.x, walker.Position.y, 0);
+            if (m_BoardData[currentPosition.x, currentPosition.y].HasCreatedTile == false)
             {
-               tileMap.SetTile(currentPosition, Floor);
-               tileCount++;
-               gridHandler[currentPosition.x, currentPosition.y] = Grid.Floor;
-               hasCreatedFloor = true;
+               _tilemap.SetTile(currentPosition, grassTile);
+               _tileCount++;
+               _emptyCellList.Add(walker.Position);
+               m_BoardData[currentPosition.x, currentPosition.y].HasCreatedTile = true;
+               hasCreated = true;
             }
          }
-         //Walker Methods
-         ChanceToRemove();
-         ChanceToRedirect();
-         ChanceToCreate();
-         UpdatePosition();
-
-         if (hasCreatedFloor)
+         WalkerMoveFoward();
+         WalkerSpawn();
+         WalkerTurn();
+         if (hasCreated)
          {
             yield return new WaitForSeconds(waitTime);
          }
       }
-      StartCoroutine(CreateWall());
    }
 
-   IEnumerator CreateWall()
+   
+   void WalkerMoveFoward()
    {
-      for (int x = 0; x < gridHandler.GetLength(0) - 1; x++)
+      for (int i = 0; i < Walkers.Count; i++)
       {
-         for (int y = 0; y < gridHandler.GetLength(1) - 1; y++)
+         WalkerObject walker = Walkers[i];
+         if (UnityEngine.Random.value > walker.ChanceToChange)
          {
-            if (gridHandler[x, y] == Grid.Floor)
+            if (walker.Direction == Vector2.right)
             {
-               bool hasCreatedWall = false;
-               if (gridHandler[x+1, y] == Grid.Empty)
-               {
-                  tileMap.SetTile(new Vector3Int(x+1,y,0), Wall);
-                  gridHandler[x+1, y] = Grid.Wall;
-                  hasCreatedWall = true;
-               }
-               if (gridHandler[x-1, y] == Grid.Empty)
-               {
-                  tileMap.SetTile(new Vector3Int(x-1,y,0), Wall);
-                  gridHandler[x-1, y] = Grid.Wall;
-                  hasCreatedWall = true;
-               }
-               if (gridHandler[x, y+1] == Grid.Empty)
-               {
-                  tileMap.SetTile(new Vector3Int(x,y+1,0), Wall);
-                  gridHandler[x, y+1] = Grid.Wall;
-                  hasCreatedWall = true;
-               }
-               if (gridHandler[x, y-1] == Grid.Empty)
-               {
-                  tileMap.SetTile(new Vector3Int(x,y-1,0), Wall);
-                  gridHandler[x, y-1] = Grid.Wall;
-                  hasCreatedWall = true;
-               }
+               walker.Position.x += 1;
+            }
 
-               if (hasCreatedWall)
-               {
-                  yield return new WaitForSeconds(waitTime);
-               }
+            if (walker.Direction == Vector2.left)
+            {
+               walker.Position.x -= 1;
+            }
+            if (walker.Direction == Vector2.up)
+            {
+               walker.Position.y += 1;
+            }
+
+            if (walker.Direction == Vector2.down)
+            {
+               walker.Position.y -= 1;
             }
          }
       }
    }
 
-   void ChanceToRemove()
-   {
-      int updatedCount = Walkers.Count;
-      for (int i = 0; i < updatedCount; i++)
-      {
-         if (UnityEngine.Random.value < Walkers[i].ChanceToChange && Walkers.Count > 1)
-         {
-            Walkers.RemoveAt(i);
-            break;
-         }
-      }
-   }
-
-   void ChanceToRedirect()
+   void WalkerTurn()
    {
       for (int i = 0; i < Walkers.Count; i++)
       {
-         if (UnityEngine.Random.value < Walkers[i].ChanceToChange)
+         WalkerObject walker = Walkers[i];
+         if (UnityEngine.Random.value > walker.ChanceToChange)
          {
-            WalkerObject curWalker = Walkers[i];
-            curWalker.Direction = GetDirection();
-            Walkers[i] = curWalker;
+            walker.Direction = GetDirection(); 
          }
       }
+      
    }
 
-   void ChanceToCreate()
+   void WalkerSpawn()
    {
-      int updatedCount = Walkers.Count;
-      for (int i = 0; i < updatedCount; i++)
+      for (int i = 0; i < Walkers.Count; i++)
       {
-         if (UnityEngine.Random.value < Walkers[i].ChanceToChange && Walkers.Count < maxWalker)
+         WalkerObject walker = Walkers[i];
+         if (UnityEngine.Random.value > walker.ChanceToChange && Walkers.Count < maxWalkerNumber)
          {
             Vector2 newDirection = GetDirection();
-            Vector2 newPosition = Walkers[i].Position;
-
-            WalkerObject newWalker = new WalkerObject(newPosition, newDirection, 0.5f);
+            Vector2Int newPosition = walker.Position;
+            WalkerObject newWalker = new WalkerObject(newPosition, newDirection,0.5f);
             Walkers.Add(newWalker);
          }
       }
    }
 
-   void UpdatePosition()
-   {
-      for (int i = 0; i < Walkers.Count; i++)
-      {
-         WalkerObject foundWalker = Walkers[i];
-         foundWalker.Position += foundWalker.Direction;
-         foundWalker.Position.x = Mathf.Clamp(foundWalker.Position.x, 1, gridHandler.GetLength(0) - 2);
-         foundWalker.Position.y = Mathf.Clamp(foundWalker.Position.y, 1, gridHandler.GetLength(1) - 2);
-         Walkers[i] = foundWalker;
-      }
-   }
    
-
 }
