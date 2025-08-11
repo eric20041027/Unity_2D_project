@@ -16,7 +16,6 @@ public class BoardManager : MonoBehaviour
    public List<WalkerObject> Walkers;
    public Tilemap tileMap;
    public Tile Floor;
-   public Tile Empty;
    public Tile Wall;
    public int mapHeight = 30;
    public int mapWidth = 30;
@@ -34,9 +33,9 @@ public class BoardManager : MonoBehaviour
    void InitialGrid()
    {
       gridHandler = new Grid[mapHeight, mapWidth];
-      for (int y = 0; y < gridHandler.Length; y++)
+      for (int x = 0; x < gridHandler.GetLength(0); x++)
       {
-         for (int x = 0; x < gridHandler.Length; x++)
+         for (int y = 0; y < gridHandler.GetLength(1); y++)
          {
             gridHandler[x,y] = Grid.Empty; 
          }
@@ -87,13 +86,116 @@ public class BoardManager : MonoBehaviour
                hasCreatedFloor = true;
             }
          }
+         //Walker Methods
+         ChanceToRemove();
+         ChanceToRedirect();
+         ChanceToCreate();
+         UpdatePosition();
 
          if (hasCreatedFloor)
          {
             yield return new WaitForSeconds(waitTime);
          }
       }
+      StartCoroutine(CreateWall());
    }
-  
+
+   IEnumerator CreateWall()
+   {
+      for (int x = 0; x < gridHandler.GetLength(0) - 1; x++)
+      {
+         for (int y = 0; y < gridHandler.GetLength(1) - 1; y++)
+         {
+            if (gridHandler[x, y] == Grid.Floor)
+            {
+               bool hasCreatedWall = false;
+               if (gridHandler[x+1, y] == Grid.Empty)
+               {
+                  tileMap.SetTile(new Vector3Int(x+1,y,0), Wall);
+                  gridHandler[x+1, y] = Grid.Wall;
+                  hasCreatedWall = true;
+               }
+               if (gridHandler[x-1, y] == Grid.Empty)
+               {
+                  tileMap.SetTile(new Vector3Int(x-1,y,0), Wall);
+                  gridHandler[x-1, y] = Grid.Wall;
+                  hasCreatedWall = true;
+               }
+               if (gridHandler[x, y+1] == Grid.Empty)
+               {
+                  tileMap.SetTile(new Vector3Int(x,y+1,0), Wall);
+                  gridHandler[x, y+1] = Grid.Wall;
+                  hasCreatedWall = true;
+               }
+               if (gridHandler[x, y-1] == Grid.Empty)
+               {
+                  tileMap.SetTile(new Vector3Int(x,y-1,0), Wall);
+                  gridHandler[x, y-1] = Grid.Wall;
+                  hasCreatedWall = true;
+               }
+
+               if (hasCreatedWall)
+               {
+                  yield return new WaitForSeconds(waitTime);
+               }
+            }
+         }
+      }
+   }
+
+   void ChanceToRemove()
+   {
+      int updatedCount = Walkers.Count;
+      for (int i = 0; i < updatedCount; i++)
+      {
+         if (UnityEngine.Random.value < Walkers[i].ChanceToChange && Walkers.Count > 1)
+         {
+            Walkers.RemoveAt(i);
+            break;
+         }
+      }
+   }
+
+   void ChanceToRedirect()
+   {
+      for (int i = 0; i < Walkers.Count; i++)
+      {
+         if (UnityEngine.Random.value < Walkers[i].ChanceToChange)
+         {
+            WalkerObject curWalker = Walkers[i];
+            curWalker.Direction = GetDirection();
+            Walkers[i] = curWalker;
+         }
+      }
+   }
+
+   void ChanceToCreate()
+   {
+      int updatedCount = Walkers.Count;
+      for (int i = 0; i < updatedCount; i++)
+      {
+         if (UnityEngine.Random.value < Walkers[i].ChanceToChange && Walkers.Count < maxWalker)
+         {
+            Vector2 newDirection = GetDirection();
+            Vector2 newPosition = Walkers[i].Position;
+
+            WalkerObject newWalker = new WalkerObject(newPosition, newDirection, 0.5f);
+            Walkers.Add(newWalker);
+         }
+      }
+   }
+
+   void UpdatePosition()
+   {
+      for (int i = 0; i < Walkers.Count; i++)
+      {
+         WalkerObject foundWalker = Walkers[i];
+         foundWalker.Position += foundWalker.Direction;
+         foundWalker.Position.x = Mathf.Clamp(foundWalker.Position.x, 1, gridHandler.GetLength(0) - 2);
+         foundWalker.Position.y = Mathf.Clamp(foundWalker.Position.y, 1, gridHandler.GetLength(1) - 2);
+         Walkers[i] = foundWalker;
+      }
+   }
+   
 
 }
