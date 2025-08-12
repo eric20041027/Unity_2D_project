@@ -15,7 +15,7 @@ public class BoardManager : MonoBehaviour
 
    public CellData GetCellData(Vector2Int cellIndex)
    {
-      if (cellIndex.x < 0 || cellIndex.x > width || cellIndex.y < 0 || cellIndex.y > height)
+      if (cellIndex.x < 0 || cellIndex.x > m_BoardData.GetLength(0) || cellIndex.y < 0 || cellIndex.y > m_BoardData.GetLength(1))
       {
          return null;
       } 
@@ -27,25 +27,26 @@ public class BoardManager : MonoBehaviour
       return _grid.GetCellCenterWorld((Vector3Int)cellIndex);
    }
 
+   public int cellSize;
    private List<Vector2Int> _emptyCellList;
-   public int height = 30;
-   public int width = 30;
-   private Tilemap _tilemap;
+   public int height;
+   public int width;
+   public Tilemap _tilemap;
    private Grid _grid;
    private CellData[,] m_BoardData;
    public Tile grassTile;
-   public Tile dirtTile;
-   public Tile clayTile;
-   private int _tileCount;
+   //public Tile dirtTile;
+   //public Tile clayTile;
+   private int _tileCount = 0;
    public float fillPercentage = 0.5f;
    public float waitTime = 0.05f;
    public List<WalkerObject> Walkers;
    public int maxWalkerNumber =10;
 
-   private void Start()
+   public void Init()
    {
+      PlayerController player = GameObject.Find("Player").GetComponent<PlayerController>();
       _grid = GetComponent<Grid>();
-      _tilemap = GetComponent<Tilemap>();
       _emptyCellList = new List<Vector2Int>();
       m_BoardData = new CellData[width, height];
       InitialGrid();
@@ -61,12 +62,18 @@ public class BoardManager : MonoBehaviour
             m_BoardData[x, y].CotainedObject = null;
             m_BoardData[x, y].HasCreatedTile = false;
             m_BoardData[x, y].Passible = false;
+            if (y == height - 1 ||  x == width - 1 || x == 0 || y == 0)
+            {
+               m_BoardData[x, y].HasCreatedTile = true;
+            }
          }
       }
 
       Walkers = new List<WalkerObject>();
-      WalkerObject walker = new WalkerObject (Vector2Int.zero,GetDirection(),0.5f);
+      WalkerObject walker = new WalkerObject (new Vector2Int(m_BoardData.GetLength(0)/2,m_BoardData.GetLength(1)/2),GetDirection(),0.5f);
       _tilemap.SetTile(new Vector3Int(walker.Position.x,walker.Position.y,0), grassTile);
+      m_BoardData[walker.Position.x, walker.Position.y].HasCreatedTile = true;
+      m_BoardData[walker.Position.x, walker.Position.y].Passible = true;
       Walkers.Add(walker);
       _tileCount++;
       StartCoroutine(CreateBoard());
@@ -91,18 +98,19 @@ public class BoardManager : MonoBehaviour
 
    IEnumerator CreateBoard()
    {
-      while ((float)_tileCount /(float)m_BoardData.Length < fillPercentage)
+      while (_tileCount /(float)m_BoardData.Length < fillPercentage)
       {
          bool hasCreated = false;
          foreach (WalkerObject walker in Walkers)
          {
-            Vector3Int currentPosition = new Vector3Int(walker.Position.x, walker.Position.y, 0);
-            if (m_BoardData[currentPosition.x, currentPosition.y].HasCreatedTile == false)
+            Vector3Int currentPosition = new Vector3Int(walker.Position.x,walker.Position.y,0);
+            if (m_BoardData[walker.Position.x, walker.Position.y].HasCreatedTile == false)
             {
                _tilemap.SetTile(currentPosition, grassTile);
                _tileCount++;
                _emptyCellList.Add(walker.Position);
-               m_BoardData[currentPosition.x, currentPosition.y].HasCreatedTile = true;
+               m_BoardData[walker.Position.x, walker.Position.y].HasCreatedTile = true;
+               m_BoardData[walker.Position.x, walker.Position.y].Passible = true;
                hasCreated = true;
             }
          }
@@ -124,23 +132,26 @@ public class BoardManager : MonoBehaviour
          WalkerObject walker = Walkers[i];
          if (UnityEngine.Random.value > walker.ChanceToChange)
          {
-            if (walker.Direction == Vector2.right)
+            if (walker.Direction == Vector2.right && walker.Position.x < width - 1)
             {
                walker.Position.x += 1;
             }
-
-            if (walker.Direction == Vector2.left)
+            else if (walker.Direction == Vector2.left && walker.Position.x > 0)
             {
                walker.Position.x -= 1;
             }
-            if (walker.Direction == Vector2.up)
+            else if (walker.Direction == Vector2.up && walker.Position.y < height - 1)
             {
                walker.Position.y += 1;
             }
 
-            if (walker.Direction == Vector2.down)
+            else if (walker.Direction == Vector2.down && walker.Position.y > 0)
             {
                walker.Position.y -= 1;
+            }
+            else
+            {
+               WalkerTurn();
             }
          }
       }
