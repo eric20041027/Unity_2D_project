@@ -2,15 +2,22 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 using System.Collections.Generic;
 using System.Collections;
-using Random = System.Random;
 
 public class BoardManager : MonoBehaviour
 {
+   public enum Terrain
+   {
+      Dirt,
+      Grass,
+      Wall,
+      Empty
+   }
    public class CellData
    {
       public bool Passible;
       public GameObject CotainedObject;
       public bool HasCreatedTile;
+      public Terrain Terrain;
    }
 
    public CellData GetCellData(Vector2Int cellIndex)
@@ -35,10 +42,13 @@ public class BoardManager : MonoBehaviour
    private Grid _grid;
    private CellData[,] m_BoardData;
    public Tile grassTile;
-   //public Tile dirtTile;
+   public Tile wallTile;
+   public Tile dirtTile;
    //public Tile clayTile;
    private int _tileCount = 0;
-   public float fillPercentage = 0.5f;
+   private int _terrainCount = 0;
+   public float fillPercentage;
+   public float terrainfillPercentage;
    public float waitTime = 0.05f;
    public List<WalkerObject> Walkers;
    public int maxWalkerNumber =10;
@@ -60,8 +70,9 @@ public class BoardManager : MonoBehaviour
          {
             m_BoardData[x, y] = new CellData();
             m_BoardData[x, y].CotainedObject = null;
-            m_BoardData[x, y].HasCreatedTile = false;
             m_BoardData[x, y].Passible = false;
+            m_BoardData[x, y].Terrain = Terrain.Empty;
+            m_BoardData[x, y].HasCreatedTile = false;
             if (y == height - 1 ||  x == width - 1 || x == 0 || y == 0)
             {
                m_BoardData[x, y].HasCreatedTile = true;
@@ -111,6 +122,7 @@ public class BoardManager : MonoBehaviour
                _emptyCellList.Add(walker.Position);
                m_BoardData[walker.Position.x, walker.Position.y].HasCreatedTile = true;
                m_BoardData[walker.Position.x, walker.Position.y].Passible = true;
+               m_BoardData[walker.Position.x, walker.Position.y].Terrain = Terrain.Grass;
                hasCreated = true;
             }
          }
@@ -122,6 +134,89 @@ public class BoardManager : MonoBehaviour
             yield return new WaitForSeconds(waitTime);
          }
       }
+      StartCoroutine(CreateTerrain());
+   }
+
+   IEnumerator CreateWall()
+   {
+      for (int x = 1; x < m_BoardData.GetLength(0)-1; x++)
+      {
+         for (int y = 1; y < m_BoardData.GetLength(1)-1; y++)
+         {
+            bool hasCreatedWall = false;
+            if (m_BoardData[x, y].Terrain == Terrain.Grass || m_BoardData[x, y].Terrain == Terrain.Dirt)
+            {
+               if (m_BoardData[x+1,y].Terrain == Terrain.Empty)
+               {
+                  _tilemap.SetTile(new Vector3Int(x+1,y,0),wallTile);
+                  m_BoardData[x+1,y].HasCreatedTile = true;
+                  m_BoardData[x+1,y].Passible = false;
+                  m_BoardData[x+1,y].Terrain = Terrain.Wall;
+                  hasCreatedWall = true;
+               }
+               if (m_BoardData[x-1,y].Terrain == Terrain.Empty)
+               {
+                  _tilemap.SetTile(new Vector3Int(x-1,y,0),wallTile);
+                  m_BoardData[x-1, y].HasCreatedTile = true;
+                  m_BoardData[x-1,y].Passible = false;
+                  m_BoardData[x-1,y].Terrain = Terrain.Wall;
+                  hasCreatedWall = true;
+               }
+               if (m_BoardData[x,y+1].Terrain == Terrain.Empty)
+               {
+                  _tilemap.SetTile(new Vector3Int(x, y + 1, 0),wallTile);
+                  m_BoardData[x, y+1].HasCreatedTile = true;
+                  m_BoardData[x,y+1].Passible = false;
+                  m_BoardData[x,y+1].Terrain = Terrain.Wall;
+                  hasCreatedWall = true;
+               }
+               if (m_BoardData[x,y-1].Terrain == Terrain.Empty)
+               {
+                  _tilemap.SetTile(new Vector3Int(x, y - 1, 0),wallTile);
+                  m_BoardData[x, y-1].HasCreatedTile = true;
+                  m_BoardData[x,y-1].Passible = false;
+                  m_BoardData[x,y-1].Terrain = Terrain.Wall;
+                  hasCreatedWall = true;
+               }
+            }
+            
+            if (hasCreatedWall)
+            {
+               yield return new WaitForSeconds(waitTime);
+            }
+         }
+      }
+   }
+
+   IEnumerator CreateTerrain()
+   {
+      Vector2Int startTerrainPos = _emptyCellList[(int)Random.Range(0,_emptyCellList.Count-1)];
+      foreach (WalkerObject walker in Walkers)
+      {
+         walker.Position = startTerrainPos;
+      }
+      while (_terrainCount / (float)_tileCount < terrainfillPercentage)
+      {
+         bool hasCreatedTerrain = false;
+         foreach (WalkerObject walker in Walkers)
+         {
+            Vector3Int currentPos = new  Vector3Int(walker.Position.x,walker.Position.y,0);
+            if (_tilemap.GetTile(currentPos) == grassTile)
+            {
+               _tilemap.SetTile(currentPos, dirtTile);
+               m_BoardData[currentPos.x, currentPos.y].Terrain = Terrain.Dirt;
+               _terrainCount++;
+               hasCreatedTerrain = true;
+            }
+         }
+         WalkerMoveFoward();
+         WalkerTurn();
+         if (hasCreatedTerrain)
+         {
+            yield return new WaitForSeconds(waitTime);
+         }
+      }
+      StartCoroutine(CreateWall());
    }
 
    
