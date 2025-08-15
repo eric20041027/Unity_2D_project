@@ -1,9 +1,15 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Tilemaps;
+
 public class PlayerController : MonoBehaviour
 {
     private BoardManager boardManager;
     private Vector2Int playerPosition;
+    public Animator animator;
+
+    
 
     public void PlayerSpawn(BoardManager boardManager, Vector2Int playerPosition)
     {
@@ -12,8 +18,25 @@ public class PlayerController : MonoBehaviour
         MoveTo(playerPosition);
     }
 
-    void Update()
+    private void Update()
     {
+        if (Input.GetMouseButtonDown(0))
+        {
+            Vector3 mouseScreenPos = Input.mousePosition;
+            mouseScreenPos.z = Mathf.Abs(Camera.main.transform.position.z);
+            Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(mouseScreenPos);
+            Vector3Int cellPos = boardManager._tilemap.WorldToCell(mouseWorldPos);
+            Vector2Int targetCell = new Vector2Int(cellPos.x, cellPos.y);
+            Debug.Log(targetCell);
+            BoardManager.CellData cellData = boardManager.GetCellData(targetCell);
+            if (cellData != null && cellData.Passible)
+            {
+                MoveTo(targetCell);
+            }
+        }
+    }
+    /*    void Update()
+    { 
         bool hasMoved = false;
         Vector2Int newTargeCell = playerPosition;
         if (Keyboard.current.upArrowKey.wasPressedThisFrame)
@@ -47,12 +70,11 @@ public class PlayerController : MonoBehaviour
             {
                 MoveTo(newTargeCell);
             }
-        }
-        
-    }
+        } 
+    }*/
     
    void MoveTo(Vector2Int cellPosition){
        playerPosition = cellPosition;
        transform.position = boardManager.GetCellPosition(cellPosition);
-    }
+   }
 }

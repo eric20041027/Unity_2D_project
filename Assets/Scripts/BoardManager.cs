@@ -36,6 +36,7 @@ public class BoardManager : MonoBehaviour
 
    public int cellSize;
    private List<Vector2Int> _emptyCellList;
+   public GameObject ObstaclePrefab;
    public int height;
    public int width;
    public Tilemap _tilemap;
@@ -217,6 +218,7 @@ public class BoardManager : MonoBehaviour
          }
       }
       StartCoroutine(CreateWall());
+      ObstacleSpawn();
    }
 
    
@@ -278,6 +280,22 @@ public class BoardManager : MonoBehaviour
             Walkers.Add(newWalker);
          }
       }
+   }
+
+   void ObstacleSpawn()
+   {
+      int spawnCount = Random.Range(10, 20);
+      for (int i = 0; i < spawnCount; i++)
+      {
+         int randomIndex = Random.Range(0, _emptyCellList.Count - 1);
+         Vector2Int spawnPos = _emptyCellList[randomIndex];
+         _emptyCellList.RemoveAt(randomIndex);
+         CellData data = m_BoardData[spawnPos.x, spawnPos.y];
+         GameObject Obstacle = Instantiate(ObstaclePrefab);
+         Obstacle.transform.position = GetCellPosition(spawnPos);
+         data.CotainedObject = Obstacle;
+      }
+      
    }
 
    
