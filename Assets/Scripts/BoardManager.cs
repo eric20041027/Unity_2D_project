@@ -53,6 +53,8 @@ public class BoardManager : MonoBehaviour
    public float waitTime = 0.05f;
    public List<WalkerObject> Walkers;
    public int maxWalkerNumber =10;
+   public LayerMask mouseColliderPlainLayer;
+
 
    public void Init()
    {
@@ -293,6 +295,7 @@ public class BoardManager : MonoBehaviour
          CellData data = m_BoardData[spawnPos.x, spawnPos.y];
          GameObject Obstacle = Instantiate(ObstaclePrefab);
          Obstacle.transform.position = GetCellPosition(spawnPos);
+         data.Passible = false;
          data.CotainedObject = Obstacle;
       }
       

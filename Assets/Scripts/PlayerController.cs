@@ -22,16 +22,17 @@ public class PlayerController : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(0))
         {
-            Vector3 mouseScreenPos = Input.mousePosition;
-            mouseScreenPos.z = Mathf.Abs(Camera.main.transform.position.z);
-            Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(mouseScreenPos);
-            Vector3Int cellPos = boardManager._tilemap.WorldToCell(mouseWorldPos);
-            Vector2Int targetCell = new Vector2Int(cellPos.x, cellPos.y);
-            Debug.Log(targetCell);
-            BoardManager.CellData cellData = boardManager.GetCellData(targetCell);
-            if (cellData != null && cellData.Passible)
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            if(Physics.Raycast(ray, out RaycastHit raycastHit,999f,boardManager.mouseColliderPlainLayer))
             {
-                MoveTo(targetCell);
+                Vector3Int cellPos = boardManager._tilemap.WorldToCell(raycastHit.point);
+                Vector2Int targetCell = new Vector2Int(cellPos.x, cellPos.y);
+                Debug.Log(targetCell);
+                BoardManager.CellData cellData = boardManager.GetCellData(targetCell);
+                if (cellData != null && cellData.Passible)
+                {
+                    MoveTo(targetCell);
+                }
             }
         }
     }
@@ -76,5 +77,5 @@ public class PlayerController : MonoBehaviour
    void MoveTo(Vector2Int cellPosition){
        playerPosition = cellPosition;
        transform.position = boardManager.GetCellPosition(cellPosition);
-   }
+    }
 }
