@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 using System.Collections.Generic;
 using System.Collections;
+using Unity.AI.Navigation;
+using UnityEngine.AI;
 
 public class BoardManager : MonoBehaviour
 {
@@ -25,7 +27,7 @@ public class BoardManager : MonoBehaviour
       if (cellIndex.x < 0 || cellIndex.x > m_BoardData.GetLength(0) || cellIndex.y < 0 || cellIndex.y > m_BoardData.GetLength(1))
       {
          return null;
-      } 
+      }
       return m_BoardData[cellIndex.x, cellIndex.y];
    }
 
@@ -52,7 +54,10 @@ public class BoardManager : MonoBehaviour
    public float terrainfillPercentage;
    public float waitTime = 0.05f;
    public List<WalkerObject> Walkers;
-   public int maxWalkerNumber =10;
+   public int maxWalkerNumber = 10;
+   public LayerMask mouseColliderPlainLayer;
+   private NavMeshSurface navMeshSurface;
+   public GameObject ground;
 
    public void Init()
    {
@@ -60,11 +65,18 @@ public class BoardManager : MonoBehaviour
       _grid = GetComponent<Grid>();
       _emptyCellList = new List<Vector2Int>();
       m_BoardData = new CellData[width, height];
+      NavMeshAgent agent = GetComponent<NavMeshAgent>();
       InitialGrid();
    }
 
    void InitialGrid()
    {
+      /*
+      Vector3 centerPos = GetCellPosition(new Vector2Int(width / 2, height / 2));
+      GameObject groundObj = Instantiate(ground, centerPos, Quaternion.identity);
+      groundObj.transform.SetParent(this.transform);
+      groundObj.transform.localScale = new Vector3(width, 1, height);
+      */
       for (int x = 0; x < width; x++)
       {
          for (int y = 0; y < height; y++)
@@ -74,7 +86,7 @@ public class BoardManager : MonoBehaviour
             m_BoardData[x, y].Passible = false;
             m_BoardData[x, y].Terrain = Terrain.Empty;
             m_BoardData[x, y].HasCreatedTile = false;
-            if (y == height - 1 ||  x == width - 1 || x == 0 || y == 0)
+            if (y == height - 1 || x == width - 1 || x == 0 || y == 0)
             {
                m_BoardData[x, y].HasCreatedTile = true;
             }
@@ -82,8 +94,8 @@ public class BoardManager : MonoBehaviour
       }
 
       Walkers = new List<WalkerObject>();
-      WalkerObject walker = new WalkerObject (new Vector2Int(m_BoardData.GetLength(0)/2,m_BoardData.GetLength(1)/2),GetDirection(),0.5f);
-      _tilemap.SetTile(new Vector3Int(walker.Position.x,walker.Position.y,0), grassTile);
+      WalkerObject walker = new WalkerObject(new Vector2Int(m_BoardData.GetLength(0) / 2, m_BoardData.GetLength(1) / 2), GetDirection(), 0.5f);
+      _tilemap.SetTile(new Vector3Int(walker.Position.x, walker.Position.y, 0), grassTile);
       m_BoardData[walker.Position.x, walker.Position.y].HasCreatedTile = true;
       m_BoardData[walker.Position.x, walker.Position.y].Passible = true;
       Walkers.Add(walker);
@@ -96,13 +108,13 @@ public class BoardManager : MonoBehaviour
       int direction = Mathf.FloorToInt(UnityEngine.Random.value * 3.99f);
       switch (direction)
       {
-         case 0:  
+         case 0:
             return Vector2.right;
-         case 1:  
+         case 1:
             return Vector2.left;
-         case 2:  
+         case 2:
             return Vector2.up;
-         case 3:  
+         case 3:
             return Vector2.down;
       }
       return Vector2.zero;
@@ -110,12 +122,12 @@ public class BoardManager : MonoBehaviour
 
    IEnumerator CreateBoard()
    {
-      while (_tileCount /(float)m_BoardData.Length < fillPercentage)
+      while (_tileCount / (float)m_BoardData.Length < fillPercentage)
       {
          bool hasCreated = false;
          foreach (WalkerObject walker in Walkers)
          {
-            Vector3Int currentPosition = new Vector3Int(walker.Position.x,walker.Position.y,0);
+            Vector3Int currentPosition = new Vector3Int(walker.Position.x, walker.Position.y, 0);
             if (m_BoardData[walker.Position.x, walker.Position.y].HasCreatedTile == false)
             {
                _tilemap.SetTile(currentPosition, grassTile);
@@ -140,47 +152,47 @@ public class BoardManager : MonoBehaviour
 
    IEnumerator CreateWall()
    {
-      for (int x = 1; x < m_BoardData.GetLength(0)-1; x++)
+      for (int x = 1; x < m_BoardData.GetLength(0) - 1; x++)
       {
-         for (int y = 1; y < m_BoardData.GetLength(1)-1; y++)
+         for (int y = 1; y < m_BoardData.GetLength(1) - 1; y++)
          {
             bool hasCreatedWall = false;
             if (m_BoardData[x, y].Terrain == Terrain.Grass || m_BoardData[x, y].Terrain == Terrain.Dirt)
             {
-               if (m_BoardData[x+1,y].Terrain == Terrain.Empty)
+               if (m_BoardData[x + 1, y].Terrain == Terrain.Empty)
                {
-                  _tilemap.SetTile(new Vector3Int(x+1,y,0),wallTile);
-                  m_BoardData[x+1,y].HasCreatedTile = true;
-                  m_BoardData[x+1,y].Passible = false;
-                  m_BoardData[x+1,y].Terrain = Terrain.Wall;
+                  _tilemap.SetTile(new Vector3Int(x + 1, y, 0), wallTile);
+                  m_BoardData[x + 1, y].HasCreatedTile = true;
+                  m_BoardData[x + 1, y].Passible = false;
+                  m_BoardData[x + 1, y].Terrain = Terrain.Wall;
                   hasCreatedWall = true;
                }
-               if (m_BoardData[x-1,y].Terrain == Terrain.Empty)
+               if (m_BoardData[x - 1, y].Terrain == Terrain.Empty)
                {
-                  _tilemap.SetTile(new Vector3Int(x-1,y,0),wallTile);
-                  m_BoardData[x-1, y].HasCreatedTile = true;
-                  m_BoardData[x-1,y].Passible = false;
-                  m_BoardData[x-1,y].Terrain = Terrain.Wall;
+                  _tilemap.SetTile(new Vector3Int(x - 1, y, 0), wallTile);
+                  m_BoardData[x - 1, y].HasCreatedTile = true;
+                  m_BoardData[x - 1, y].Passible = false;
+                  m_BoardData[x - 1, y].Terrain = Terrain.Wall;
                   hasCreatedWall = true;
                }
-               if (m_BoardData[x,y+1].Terrain == Terrain.Empty)
+               if (m_BoardData[x, y + 1].Terrain == Terrain.Empty)
                {
-                  _tilemap.SetTile(new Vector3Int(x, y + 1, 0),wallTile);
-                  m_BoardData[x, y+1].HasCreatedTile = true;
-                  m_BoardData[x,y+1].Passible = false;
-                  m_BoardData[x,y+1].Terrain = Terrain.Wall;
+                  _tilemap.SetTile(new Vector3Int(x, y + 1, 0), wallTile);
+                  m_BoardData[x, y + 1].HasCreatedTile = true;
+                  m_BoardData[x, y + 1].Passible = false;
+                  m_BoardData[x, y + 1].Terrain = Terrain.Wall;
                   hasCreatedWall = true;
                }
-               if (m_BoardData[x,y-1].Terrain == Terrain.Empty)
+               if (m_BoardData[x, y - 1].Terrain == Terrain.Empty)
                {
-                  _tilemap.SetTile(new Vector3Int(x, y - 1, 0),wallTile);
-                  m_BoardData[x, y-1].HasCreatedTile = true;
-                  m_BoardData[x,y-1].Passible = false;
-                  m_BoardData[x,y-1].Terrain = Terrain.Wall;
+                  _tilemap.SetTile(new Vector3Int(x, y - 1, 0), wallTile);
+                  m_BoardData[x, y - 1].HasCreatedTile = true;
+                  m_BoardData[x, y - 1].Passible = false;
+                  m_BoardData[x, y - 1].Terrain = Terrain.Wall;
                   hasCreatedWall = true;
                }
             }
-            
+
             if (hasCreatedWall)
             {
                yield return new WaitForSeconds(waitTime);
@@ -191,7 +203,7 @@ public class BoardManager : MonoBehaviour
 
    IEnumerator CreateTerrain()
    {
-      Vector2Int startTerrainPos = _emptyCellList[(int)Random.Range(0,_emptyCellList.Count-1)];
+      Vector2Int startTerrainPos = _emptyCellList[(int)Random.Range(0, _emptyCellList.Count - 1)];
       foreach (WalkerObject walker in Walkers)
       {
          walker.Position = startTerrainPos;
@@ -201,7 +213,7 @@ public class BoardManager : MonoBehaviour
          bool hasCreatedTerrain = false;
          foreach (WalkerObject walker in Walkers)
          {
-            Vector3Int currentPos = new  Vector3Int(walker.Position.x,walker.Position.y,0);
+            Vector3Int currentPos = new Vector3Int(walker.Position.x, walker.Position.y, 0);
             if (_tilemap.GetTile(currentPos) == grassTile)
             {
                _tilemap.SetTile(currentPos, dirtTile);
@@ -221,7 +233,7 @@ public class BoardManager : MonoBehaviour
       ObstacleSpawn();
    }
 
-   
+
    void WalkerMoveFoward()
    {
       for (int i = 0; i < Walkers.Count; i++)
@@ -261,10 +273,10 @@ public class BoardManager : MonoBehaviour
          WalkerObject walker = Walkers[i];
          if (UnityEngine.Random.value > walker.ChanceToChange)
          {
-            walker.Direction = GetDirection(); 
+            walker.Direction = GetDirection();
          }
       }
-      
+
    }
 
    void WalkerSpawn()
@@ -276,7 +288,7 @@ public class BoardManager : MonoBehaviour
          {
             Vector2 newDirection = GetDirection();
             Vector2Int newPosition = walker.Position;
-            WalkerObject newWalker = new WalkerObject(newPosition, newDirection,0.5f);
+            WalkerObject newWalker = new WalkerObject(newPosition, newDirection, 0.5f);
             Walkers.Add(newWalker);
          }
       }
@@ -293,10 +305,9 @@ public class BoardManager : MonoBehaviour
          CellData data = m_BoardData[spawnPos.x, spawnPos.y];
          GameObject Obstacle = Instantiate(ObstaclePrefab);
          Obstacle.transform.position = GetCellPosition(spawnPos);
+         data.Passible = false;
          data.CotainedObject = Obstacle;
       }
-      
-   }
 
-   
+   }
 }
