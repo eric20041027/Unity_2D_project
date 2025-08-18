@@ -12,7 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 13312, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: Clay
   m_EditorClassIdentifier: 
+<<<<<<< HEAD
   m_Sprite: {fileID: 21300000, guid: c3b2ac5befbef40d49969be6dea9f1c8, type: 3}
+=======
+  m_Sprite: {fileID: 21300000, guid: 7e32175b4428c4c46b9a2b826c0b7473, type: 3}
+>>>>>>> fde3e1a (8/18)
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Transform:
     e00: 1

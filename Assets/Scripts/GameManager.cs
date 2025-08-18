@@ -20,6 +20,11 @@ public class GameManager : MonoBehaviour
     private void Start()
     {
         boardManager.Init();
+<<<<<<< HEAD
+=======
+        boardManager.SpawnInitGrid(new Vector2Int(2, 2));
+        boardManager.InitialGrid();
+>>>>>>> fde3e1a (8/18)
         playerController.PlayerSpawn(boardManager,new Vector2Int(boardManager.width/2,boardManager.height/2));
     }
     
